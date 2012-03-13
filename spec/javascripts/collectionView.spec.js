@@ -36,11 +36,6 @@ describe("collection view", function(){
     }
   });
 
-  var CompositeView = Backbone.Marionette.CollectionView.extend({
-    itemView: ItemView,
-    template: "#composite-template"
-  });
-
   var NoItemView = Backbone.Marionette.CollectionView.extend({
   });
 
@@ -62,21 +57,19 @@ describe("collection view", function(){
   describe("when rendering a collection view", function(){
     var collection = new Collection([{foo: "bar"}, {foo: "baz"}]);
     var collectionView;
-    var renderResult;
+    var deferredResolved;
 
     beforeEach(function(){
       collectionView = new CollectionView({
         collection: collection
       });
 
-      spyOn(collectionView, "renderItem").andCallThrough();
       spyOn(collectionView, "onRender").andCallThrough();
+      spyOn(collectionView, "trigger").andCallThrough();
 
-      renderResult = collectionView.render();
-    });
+      var deferred = collectionView.render();
 
-    it("should render the specified itemView for each item", function(){
-      expect(collectionView.renderItem.callCount).toBe(2);
+      deferred.done(function(){ deferredResolved = true });
     });
 
     it("should append the html for each itemView", function(){
@@ -91,15 +84,18 @@ describe("collection view", function(){
       expect(collectionView.onRender).toHaveBeenCalled();
     });
 
-    it("should return the view after rendering", function(){
-      expect(renderResult).toBe(collectionView);
+    it("should trigger a 'rendered' event", function(){
+      expect(collectionView.trigger).toHaveBeenCalledWith("collection:rendered", collectionView);
+    });
+
+    it("should resolve the deferred object that it returned", function(){
+      expect(deferredResolved).toBe(true);
     });
   });
 
   describe("when a collection is reset after the view is loaded", function(){
     var collection;
     var collectionView;
-    var renderResult;
 
     beforeEach(function(){
       collection = new Collection();
@@ -108,21 +104,16 @@ describe("collection view", function(){
         collection: collection
       });
 
-      spyOn(collectionView, "renderItem").andCallThrough();
       spyOn(collectionView, "onRender").andCallThrough();
       spyOn(collectionView, "closeChildren").andCallThrough();
 
-      renderResult = collectionView.render();
+      collectionView.render();
 
       collection.reset([{foo: "bar"}, {foo: "baz"}]);
     });
 
     it("should close all open child views", function(){
       expect(collectionView.closeChildren).toHaveBeenCalled();
-    });
-
-    it("should render the specified itemView for each item", function(){
-      expect(collectionView.renderItem.callCount).toBe(2);
     });
 
     it("should append the html for each itemView", function(){
@@ -136,11 +127,6 @@ describe("collection view", function(){
     it("should call 'onRender' after rendering", function(){
       expect(collectionView.onRender).toHaveBeenCalled();
     });
-
-    it("should return the view after rendering", function(){
-      expect(renderResult).toBe(collectionView);
-    });
-
   });
 
   describe("when a model is added to the collection", function(){
@@ -272,8 +258,6 @@ describe("collection view", function(){
         collection: collection
       });
 
-      spyOn(collectionView, "renderItem").andCallThrough();
-
       collectionView.render();
     });
 
@@ -281,33 +265,4 @@ describe("collection view", function(){
       expect($(collectionView.$el)).toHaveHtml("<span>baz</span><span>bar</span>");
     });
   });
-
-  describe("when a collection view has a model and a template", function(){
-    var compositeView;
-
-    beforeEach(function(){
-      loadFixtures("compositeTemplate.html");
-
-      var m1 = new Model({foo: "bar"});
-      var m2 = new Model({foo: "baz"});
-      collection = new Collection();
-      collection.add(m2);
-
-      compositeView = new CompositeView({
-        model: m1,
-        collection: collection
-      });
-
-      compositeView.render();
-    });
-
-    it("should render the template with the model", function(){
-      expect(compositeView.$el).toHaveText(/composite bar/);
-    });
-
-    it("should render the collection's items", function(){
-      expect(compositeView.$el).toHaveText(/baz/);
-    });
-  });
-
 });

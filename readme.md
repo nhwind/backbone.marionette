@@ -19,9 +19,9 @@ Backbone.Marionette just because you want to use some of it.
 You can download the raw source code above, fork the repository or
 use these links:
 
-Development: [backbone.marionette.js](https://raw.github.com/derickbailey/backbone.marionette/master/backbone.marionette.js) 14.53K file size (4.77K gzipped)
+Development: [backbone.marionette.js](https://raw.github.com/derickbailey/backbone.marionette/master/backbone.marionette.js) 21.3 file size (5.54K gzipped)
 
-Production: [backbone.marionette.min.js](https://raw.github.com/derickbailey/backbone.marionette/master/backbone.marionette.min.js) 5.21K file size (1.78K gzipped)
+Production: [backbone.marionette.min.js](https://raw.github.com/derickbailey/backbone.marionette/master/backbone.marionette.min.js) 6.82K file size (2.1K gzipped)
 
 ## Annotated Source Code
 
@@ -35,13 +35,15 @@ These are the strings that you can pull to make your puppet dance:
 * **Backbone.Marionette.AppRouter**: Reduce your routers to nothing more then configuration
 * **Backbone.Marionette.ItemView**: A view that renders a single item
 * **Backbone.Marionette.CollectionView**: A view that iterates over a collection, and renders individual `ItemView` instances for each model
-* **Backbone.Marionette.RegionManager**: Manage visual regions of your application, including display and removal of content
+* **Backbone.Marionette.CompositeView**: A collection view and item view, for rendering leaf-branch/composite model hierarchies
+* **Backbone.Marionette.Layout**: A view that renders a layout and creates region managers to manage areas within it
+* **Backbone.Marionette.Region**: Manage visual regions of your application, including display and removal of content
 * **Backbone.Marionette.EventAggregator**: An extension of Backbone.Events, to be used as an event-driven or pub-sub tool
 * **Backbone.Marionette.BindTo**: An event binding manager, to facilitate binding and unbinding of events
-* **Backbone.Marionette.TemplateManager**: Cache templates that are stored in `<script>` blocks, for faster subsequent access
+* **Backbone.Marionette.TemplateCache**: Cache templates that are stored in `<script>` blocks, for faster subsequent access
 * **Backbone.Marionette.Callbacks**: Manage a collection of callback methods, and execute them as needed
 
-The `Application`, `RegionManager`, `ItemView` and `CollectionView` use the 
+The `Application`, `Region`, `ItemView` and `CollectionView` use the 
 `extend` syntax and functionality from Backbone, allowing you to define new 
 versions of these objects with custom behavior.
 
@@ -216,7 +218,7 @@ contain the methods that you specified in the `appRoutes`.
 It is reocmmended that you divide your controller objects in to smaller peices of related functionality
 and have multiple routers / controllers, instead of just one giant router and controller.
 
-## Marionette.RegionManager
+## Marionette.Region
 
 Region managers provide a consistent way to manage your views and
 show / close them in your application. They use a jQuery selector
@@ -227,7 +229,7 @@ methods on your views, to facilitate additional functionality.
 
 Regions can be added to the application by calling the `addRegions` method on
 your application instance. This method expects a single hash parameter, with
-named regions and either jQuery selectors or `RegionManager` objects. You may
+named regions and either jQuery selectors or `Region` objects. You may
 call this method as many times as you like, and it will continue adding regions
 to the app. 
 
@@ -244,13 +246,13 @@ would be available for use immediately.
 
 If you specify the same region name twice, last one in wins.
 
-### Initialize A Region Manager With An `el`
+### Initialize A Region With An `el`
 
 You can specify an `el` for the region manager to manage at the time
 that the region manager is instantiated:
 
 ```js
-var mgr = new Backbone.Marionette.RegionManager({
+var mgr = new Backbone.Marionette.Region({
   el: "#someElement"
 });
 ```
@@ -285,7 +287,68 @@ var anotherView = new AnotherView();
 MyApp.mainRegion.show(anotherView);
 ```
 
-### Region Manager Events
+### Set How View's `el` Is Attached
+
+You can specify a second parameter to the `show` method,
+which will be used to determine how the HTML from the view's
+`el` is attached to the DOM region that is being managed.
+
+The options include any valid jQuery DOM object method, such
+as `html`, `text`, `append`, etc.
+
+```js
+MyApp.mainRegion.show(myView, "append");
+```
+
+This example will use jQuery's `$.append` function to append
+the new view to the current HTML.
+
+**WARNING**: Be careful when using this feature, as the view
+you are replacing may not be managed / closed correctly as a
+result. This can cause unexpected behavior, memory leaks or
+other problems. **Use At Your Own Risk**
+
+### Attach Existing View
+
+There are some scenarios where it's desirable to attach an existing
+view to a region manager, without rendering or showing the view, and
+without replacing the HTML content of the region. For example, SEO and
+accessibiliy often need HTML to be generated by the server, and progressive
+enhancement of the HTML.
+
+There are two ways to accomplish this: 
+
+* set the `currentView` in the region manager's constructor
+* call `attachView` on the region manager instance
+
+#### Set `currentView` On Initialization
+
+```js
+var myView = new MyView({
+  el: $("#existing-view-stuff")
+});
+
+var manager = new Backbone.Marionette.Region({
+  el: "#content",
+  currentView: myView
+});
+```
+
+#### Call `attachView` On Region 
+
+```js
+MyApp.addRegions({
+  someRegion: "#content"
+});
+
+var myView = new MyView({
+  el: $("#existing-view-stuff")
+});
+
+MyApp.someRegion.attachView(myView);
+```
+
+### Region Events
 
 A region manager will raise a few events during it's showing and
 closing of views:
@@ -308,10 +371,10 @@ MyApp.mainRegion.on("view:closed", function(view){
 });
 ```
 
-### Defining A Custom Region Manager
+### Defining A Custom Region 
 
 You can define a custom region manager by extending from
-`RegionManager`. This allows you to create new functionality,
+`Region`. This allows you to create new functionality,
 or provide a base set of functionality for your app.
 
 Once you define a region manager type, you can still call the
@@ -320,26 +383,26 @@ value - not an instance of it, but the actual constructor
 function.
 
 ```js
-var FooterRegion = Backbone.Marionette.RegionManager.extend({
+var FooterRegion = Backbone.Marionette.Region.extend({
   el: "#footer"
 });
 
 MyApp.addRegions({footerRegion: FooterRegion});
 ```
 
-Note that if you define your own `RegionManager` object, you must provide an
+Note that if you define your own `Region` object, you must provide an
 `el` for it. If you don't, you will receive an runtime exception saying that
 an `el` is required.
 
-### Instantiate Your Own Region Manager
+### Instantiate Your Own Region 
 
 There may be times when you want to add a region manager to your
 application after your app is up and running. To do this, you'll
-need to extend from `RegionManager` as shown above and then use
+need to extend from `Region` as shown above and then use
 that constructor function on your own:
 
 ```js
-var SomeRegion = Backbone.Marionette.RegionManager.extend({
+var SomeRegion = Backbone.Marionette.Region.extend({
   el: "#some-div"
 });
 
@@ -387,6 +450,105 @@ MyApp.mainRegion.show(view);
 The region manager will wait until the deferred object is resolved
 before it attached the view's `el` to the DOM and displays it.
 
+## Marionette.Layout
+
+Formerly known as `CompositeRegion`. 
+
+A `Layout` is a specialized hybrid between an `ItemView` and
+a collection of `Region` objects, used for rendering an application
+layout with multiple sub-regions to be managed by specified region managers.
+
+A layout manager can also be used as a composite-view to aggregate multiple
+views and sub-application areas of the screen where multiple region managers need
+to be attached to dynamically rendered HTML.
+
+The `Layout` extends directly from `ItemView` and adds the ability
+to specify `regions` which become `Region` instances that are attached
+to the layout.
+
+### Basic Usage
+
+```html
+<script id="layout-template" type="text/template">
+  <section>
+    <navigation id="menu">...</navigation>
+    <article id="content">...</navigation>
+  </section>
+</script>
+```
+
+```js
+AppLayout = Backbone.Marionette.Layout.extend({
+  template: "#layout-template",
+
+  regions: {
+    menu: "#menu",
+    content: "#content"
+  }
+});
+
+var layout = new AppLayout();
+layout.render();
+```
+
+Once you've rendered the layout, you now have direct access
+to all of the specified regions as region managers.
+
+```js
+layout.menu.show(new MenuView());
+
+layout.content.show(new MainContentView());
+```
+
+### Nested Layouts And Views
+
+Since the `Layout` extends directly from `ItemView`, it
+has all of the core functionality of an item view. This includes
+the methods necessary to be shown within an existing region manager.
+
+```js
+MyApp = new Backbone.Marionette.Application();
+MyApp.addRegions({
+  mainRegion: "#main"
+});
+
+var layout = new AppLayout();
+MyApp.mainRegion.show(layout);
+
+layout.show(new MenuView());
+```
+
+You can nest layouts into region managers as deeply as you want.
+This provides for a well organized, nested view structure.
+
+### Closing A Layout 
+
+When you are finished with a layout, you can call the
+`close` method on it. This will ensure that all of the region managers
+within the layout are closed correctly, which in turn
+ensures all of the views shown within the regions are closed correctly.
+
+If you are showing a layout within a parent region manager, replacing 
+the layout with another view or another layout will close the current 
+one, the same it will close a view.
+
+All of this ensures that layouts and the views that they
+contain are cleaned up correctly.
+
+### Event Aggregator
+
+It's common to use a `Layout` to represent a sub-application in a
+larger overall application. Often the components of the sub-application need
+to communicate with each other without allowing the other parts of the larger
+application in on the communication. To facilitate this, the layout manager
+includes an event aggregator, `vent`.
+
+```js
+var layout = new MyAppLayout();
+
+layout.vent.trigger("stuff:was:done");
+```
+
 ## Marionette.ItemView
 
 An `ItemView` is a view that represents a single item. That item may be a 
@@ -400,6 +562,19 @@ underscore.js templates.
 
 The default implementation will use a template that you specify (see
 below) and serialize the model or collection for you (see below).
+
+The `render` method will return a jQuery deferred object, allowing
+you to know when the view rendering is complete.
+
+```js
+MyView = Backbone.Marionette.ItemView.extend({...});
+
+new MyView().render().done(function(){
+  // the view is done rendering. do stuff here
+});
+```
+
+### Customizing ItemView.render
 
 You can provide a custom implementation of a method called
 `renderTemplate` to change template engines. For example, if you want
@@ -419,6 +594,8 @@ template that was specified in the view (see below).
 The `data` parameter is the serialized data for either the model or
 the collection of the view (see below).
 
+### Events And Callback methods
+
 After the view has been rendered, a `onRender` method will be called.
 You can implement this in your view to provide custom code for dealing
 with the view's `el` after it has been rendered:
@@ -430,6 +607,21 @@ Backbone.Marionette.ItemView.extend({
     // been rendered, and is full of the view's
     // HTML, ready to go.
   }
+});
+```
+
+An "item:rendered" event will also be fired. This allows you to
+add more than one callback to execute after the view is rendered,
+and allows parent views and other parts of the application to
+know that the view was rendered.
+
+```js
+MyView = Backbone.Marionette.ItemVIew.extend({...});
+
+var myView = new MyView();
+
+myView.on("item:rendered", function(){
+  alert("the view was rendered!");
 });
 ```
 
@@ -520,7 +712,7 @@ Backbone.Marionette.ItemView.extend({
 });
 ```
 
-### ItemView events
+### Binding To ItemView Events
 
 ItemView extends `Marionette.BindTo`. It is recommended that you use
 the `bindTo` method to bind model and collection events. 
@@ -576,9 +768,53 @@ specified collection, render each of them using a specified `itemView`,
 then append the results of the item view's `el` to the collection view's
 `el`.
 
+### Events And Callbacks
+
 After the view has been rendered, a `onRender` method will be called.
 You can implement this in your view to provide custom code for dealing
 with the view's `el` after it has been rendered:
+
+```js
+Backbone.Marionette.CollectionView.extend({
+  onRender: function(){
+    // do stuff here
+  }
+});
+```
+
+A "collection:rendered" event will also be fired. This allows you to
+add more than one callback to execute after the view is rendered,
+and allows parent views and other parts of the application to
+know that the view was rendered.
+
+```js
+MyView = Backbone.Marionette.CollectionView.extend({...});
+
+var myView = new MyView();
+
+myView.on("collection:rendered", function(){
+  alert("the collection view was rendered!");
+});
+```
+
+### CollectionView render
+
+The `render` method of the collection view is responsible for
+rendering the entire collection. It loops through each of the
+items in the collection and renders them individually as an
+`itemView`.
+
+The `render` method returns a jQuery deferred object, allowing
+you to know when the rendering completes. This deferred object
+is resolved after all of the child views have been rendered.
+
+```js
+MyCollectionView = Backbone.Marionette.CollectionView.extend({...});
+
+new MyCollectionView().render().done(function(){
+  // all of the children are now rendered. do stuff here.
+});
+```
 
 ### CollectionView's itemView
 
@@ -641,35 +877,6 @@ Backbone.Marionette.CollectionView.extend({
 });
 ```
 
-### Composite View
-
-A `CollectionView` can be work as a composite view for scenarios
-where it should represent both a branch and leaf in a tree structure.
-
-For example, if you're rendering a treeview control, you may want
-to render a collection view with a model and template so that it
-will show a parent item with children in the tree.
-
-You can specify a `modelView` to use for the model. If you don't
-specify one, it will default to the `Marionette.ItemView`.
-
-```js
-LeafView = Backbone.Marionette.ItemView.extend({
-  template: "leaf-template"
-});
-
-CompositeView = Backbone.Marionette.CollectionView.extend({
-  template: "leaf-template"
-  modelView: LeafView,
-  itemView: LeafView
-});
-
-new CompositeView({
-  model: someModel,
-  collection: someCollection
-});
-```
-
 ### CollectionView close
 
 CollectionView implements a `close` method, which is called by the 
@@ -695,6 +902,87 @@ Backbone.Marionette.CollectionView.extend({
   }
 });
 ```
+
+## Marionette.CompositeView
+
+A `CompositeView` extends from CollectionView to be used as a composite view for scenarios
+where it should represent both a branch and leaf in a tree structure.
+
+For example, if you're rendering a treeview control, you may want
+to render a collection view with a model and template so that it
+will show a parent item with children in the tree.
+
+You can specify a `modelView` to use for the model. If you don't
+specify one, it will default to the `Marionette.ItemView`.
+
+```js
+LeafView = Backbone.Marionette.ItemView.extend({
+  template: "leaf-template"
+});
+
+CompositeView = Backbone.Marionette.CompositeView.extend({
+  template: "leaf-template"
+  modelView: LeafView,
+  itemView: LeafView
+});
+
+new CompositeView({
+  model: someModel,
+  collection: someCollection
+});
+```
+
+### Composite Render
+
+A composite view returns a jQuery deferred object from the
+`render` method. This allows you to know when the rendering for
+the entire composite structure has been completed.
+
+```js
+MyComp = Backbone.Marionette.CompositeView.extend({...});
+
+myComp = new MyComp().render().done(function(){
+  // the entire composite is now rendered. do stuff here
+});
+```
+
+### Model And Collection Rendering
+
+The model and collection for the composite view will re-render
+themselves under the following conditions:
+
+* When the collection's "reset" event is fired, it will re-render the entire list
+* When the collection has a model added to it (the "add" event is fired), it will render that one item to the rendered list
+* When the collection has a model removed (the "remove" event is fired), it will remove that one item from the rendered list
+
+You can also manually re-render either or both of them:
+
+* If you want to re-render everything, call the `.render()` method
+* If you want to re-render the model's view, you can call `.renderModel()`
+* If you want to re-render the collection's views, you can call `.rendercollection()`
+
+### Events And Callbacks
+
+During the course of rendering a composite, several events will
+be triggered:
+
+* "composite:item:rendered" - after the `modelView` has been rendered
+* "composite:collection:rendered" - after the collection of models has been rendered
+* "composite:rendered" - after everything has been rendered
+
+Additionally, after the composite view has been rendered, an 
+`onRender` method will be called. You can implement this in 
+your view to provide custom code for dealing with the view's 
+`el` after it has been rendered:
+
+```js
+Backbone.Marionette.CompositeView.extend({
+  onRender: function(){
+    // do stuff here
+  }
+});
+```
+
 ## Marionette.EventAggregator
 
 An event aggregator is an application level pub/sub mechanism that allows various
@@ -796,24 +1084,26 @@ binder.unbindAll();
 
 This even works with in-line callback functions.
 
-## Backbone.Marionette.TemplateManager
+## Backbone.Marionette.TemplateCache
 
-The `TemplateManager` provides a cache for retrieving templates
+Formerly known as `TemplateManager`
+
+The `TemplateCache` provides a cache for retrieving templates
 from script blocks in your HTML. This will improve
 the speed of subsequent calls to get a template.
 
 ### Basic Usage
 
-To use the `TemplateManager`, call it directly. It is not
+To use the `TemplateCache`, call it directly. It is not
 instantiated like other Marionette objects.
 
 ### Get A Template
 
-Templates are retrieved by jQuery selector, by default, and
-handed back to you via a callback method:
+Templates are retrieved using a jQuery selector by default, and 
+are handed back to you via a callback method:
 
 ```js
-Backbone.Marionette.TemplateManager.get("#my-template", function(template){
+Backbone.Marionette.TemplateCache.get("#my-template", function(template){
  // use the template here
 });
 ```
@@ -823,9 +1113,9 @@ template from the cache on subsequence calls:
 
 ```js
 var a, b, c;
-Backbone.Marionette.TemplateManager.get("#my-template", function(tmpl){a = tmpl});
-Backbone.Marionette.TemplateManager.get("#my-template", function(tmpl){b = tmpl});
-Backbone.Marionette.TemplateManager.get("#my-template", function(tmpl){c = tmpl});
+Backbone.Marionette.TemplateCache.get("#my-template", function(tmpl){a = tmpl});
+Backbone.Marionette.TemplateCache.get("#my-template", function(tmpl){b = tmpl});
+Backbone.Marionette.TemplateCache.get("#my-template", function(tmpl){c = tmpl});
 a === b === c; // => true
 ```
 
@@ -834,24 +1124,46 @@ a === b === c; // => true
 The default template retrieval is to select the template contents
 from the DOM using jQuery. If you wish to change the way this
 works, you can override the `loadTemplate` method on the
-`TemplateManager` object.
-
-For example, if you want to load templates asychronously from the
-server, instead of from the DOM, you could replace `loadTemplate`
-with a function like this:
+`TemplateCache` object.
 
 ```js
-Backbone.Marionette.TemplateManager.loadTemplate = function(templateId, callback){
+Backbone.Marionette.TemplateCache.loadTemplate = function(templateId, callback){
+  // load your template here, returning it or a deferred
+  // object that resolves with the template as the only param
+}
+```
+
+For example, if you want to load templates asychronously from the
+server, instead of from the DOM, you could replace 
+`loadTemplate` function.
+
+If a "template.html" file exists on the server, with this in it:
+
+```html
+<script id="my-template" type="text/template">
+  <div>some template stuff</div>
+</script>
+```
+
+Then the `loadTemplate` implementation may look like this:
+
+```js
+Backbone.Marionette.TemplateCache.loadTemplate = function(templateId, callback){
   var that = this;
-  $.get(templateId + ".html", function(template){
-    callback.call(this, template);
+  var url = templateId + ".html";
+
+  $.get(url, function(templateHtml){
+    var template = $(tmplateHtml).find(templateId);
+    callback(template);
   });
 }
 ```
 
 This will use jQuery to asynchronously retrieve the template from
-the server, and then store the retrieved template in the template
-manager's cache.
+the server. When the `get` completes, the callback function will
+select the template from the resulting HTML and then call the
+`callback` function to send it in to the template cache and allow
+it to be used for rendering.
 
 ### Clear Items From cache
 
@@ -864,30 +1176,30 @@ If you do not specify any parameters, all items will be cleared
 from the cache:
 
 ```js
-Backbone.Marionette.TemplateManager.get("#my-template");
-Backbone.Marionette.TemplateManager.get("#this-template");
-Backbone.Marionette.TemplateManager.get("#that-template");
+Backbone.Marionette.TemplateCache.get("#my-template");
+Backbone.Marionette.TemplateCache.get("#this-template");
+Backbone.Marionette.TemplateCache.get("#that-template");
 
 // clear all templates from the cache
-Backbone.Marionette.TemplateManager.clear()
+Backbone.Marionette.TemplateCache.clear()
 ```
 
 If you specify one or more parameters, these parameters are assumed
 to be the `templateId` used for loading / caching:
 
 ```js
-Backbone.Marionette.TemplateManager.get("#my-template");
-Backbone.Marionette.TemplateManager.get("#this-template");
-Backbone.Marionette.TemplateManager.get("#that-template");
+Backbone.Marionette.TemplateCache.get("#my-template");
+Backbone.Marionette.TemplateCache.get("#this-template");
+Backbone.Marionette.TemplateCache.get("#that-template");
 
 // clear 2 of 3 templates from the cache
-Backbone.Marionette.TemplateManager.clear("#my-template", "#this-template")
+Backbone.Marionette.TemplateCache.clear("#my-template", "#this-template")
 ```
 
 ### Built In To ItemView
 
 If you're using `Marionette.ItemView`, you don't need to manually
-call the `TemplateManager`. Just specify the `template` attribute
+call the `TemplateCache`. Just specify the `template` attribute
 of your view as a jQuery selector, and the `ItemView` will use 
 the template manager by default.
 
@@ -935,7 +1247,7 @@ to manage initializers (see above).
 It can also be used to guarantee callback execution in an event
 driven scenario, much like the application initializers.
 
-## Backbone.Marionette Example Apps
+## Backbone.Marionette Sample Apps
 
 There are several sample apps available.
 
@@ -967,61 +1279,6 @@ https://github.com/sgentile/BackboneNodeContacts
 And the ASP.NET MVC version is here:
 
 https://github.com/sgentile/BackboneContacts
-
-### Quick & Dirty Sample
-
-Here's a quick and dirty example to show how to use some of the pieces of
-Marionette:
-
-```js
-// define the application
-// options we pass in are copied on to the instance
-MyApp = new Backbone.Marionette.Application({
-  someOption: "some value";
-});
-
-// add a region to the app
-myRegion = Backbone.Marionette.RegionManager.extend({
-  el: "#my-region"
-});
-MyApp.addRegions({ myRegion: MyRegion });
-
-// define some functionality for the app
-(function(MyApp, Backbone){
-
-  // a view to render into the region
-  var SomeView = Backbone.View.extend({
-    render: function(){
-
-      // get "someOption" from the app, since we
-      // passed it into the app initializer, above
-      this.$el.html(MyApp.someOption);
-    },
-
-    doSomething: function(){
-      // the applicaiton has an event aggregator on instantiation
-      // call out to the event aggregator to raise an event
-      MyApp.vent.trigger("something:happened");
-    }
-  });
-
-  // an initializer to run this functional area 
-  // when the app starts up
-  MyApp.addInitializer(function(){
-    var someView = new SomeView();
-    MyApp.myRegion.show(someView);
-    someView.doSomething();
-  });
-
-})(MyApp, Backbone);
-
-// calling start will run all of the initializers
-// this can be done from your JS file directly, or
-// from a script block in your HTML
-$(function(){
-  MyApp.start();
-});
-```
 
 ## Compatibility And Requirements
 
@@ -1059,6 +1316,64 @@ load up http://localhost:8888 to see the test suite in action.
 I'm using [Docco](http://jashkenas.github.com/docco/) to generate the annotated source code.
 
 ## Release Notes
+
+### v0.6.1
+
+* Fixed the composite view so that it renders the collection correctly when the collection is "reset"
+* Fixed the composite view so that it re-renders correctly
+* Fixed various deferred usages to only return promises, instead of the full deferred object
+
+#### v0.6.0
+
+* **BREAKING:** Renamed `LayoutManager` to `Layout`
+* **BREAKING:** Renamed `RegionManager` to `Region`
+* **BREAKING:** Renamed `TemplateManager` to `TemplateCache`
+
+* **Layout**
+  * **BREAKING:** `Layout.render` no longer returns the view itself, now returns a jQuery deferred object
+  * The `.vent` attribute is now available in the `initializer` method
+  * Ensures that regions select the `$el` within the Layout's `$el` instead of globally on the page
+  * Initialize the regions before the layout, allowing access to the regions in the `onRender` method of the layout
+  * Close the Layout's regions before closing the layout itself
+
+* **CompositeView**
+  * **BREAKING:** `CompositeView.render` no longer returns the view itself, now returns a jQuery deffered object
+  * Will only render the collection once. You can call `renderCollection` explicitly to re-render the entire collection
+  * Will only render the model view once. You can call `renderModel` explicitly to re-render the model
+  * Correctly close and dispose of the model view
+  * Triggers various events during rendering of model view and collection view
+  * Calls 'onRender' method of composite view, if it exists
+
+* **ItemView**
+  * **BREAKING:** `ItemView.render` no longer returns the view itself, now returns a jQuery deferred object
+  * Optimization to only call `.toJSON` on either model or collection, not both
+  * Trigger "item:rendered" method after rendering (in addition to calling onRender method of the view)
+
+* **CollectionView**
+  * **BREAKING:** `CollectionView.render` no longer returns the view itself, now returns a jQuery deferred object
+  * Trigger "collection:rendered" method after rendering (in addition to calling onRender method)
+
+* Large updates to the readme/documentation
+* Heavy use of `jQuery.Deferred()` and `jQuery.when/then` to better support asynchronous templates and rendering
+
+#### v0.5.2
+
+* **BREAKING:** Renamed `CompositeRegion` to `LayoutManager`
+* Aliased CompsiteRegion to LayoutManager for backwards compatibility
+* Bug fix for correctly initializing LayoutManager with specified options in constructor
+
+#### v0.5.1
+
+* Controller methods fired from an `AppRouter` are now called with `this` set to the controller, instead of the router
+* Fixed a bug in the CompositeView where the list wouldn't render when passing in a populated collection
+
+#### v0.5.0
+
+* **BREAKING:** Extraced `CompositeView` out of the collection view
+* Added `CompositeView` for managing leaf-branch/composite model structures
+* Added `CompositeRegion` for managing nested views and nested region managers
+* Added `attachView` method to `RegionManager` to attach existing view without rendering / replacing
+* Specify how to attach HTML to DOM in region manager's `show` method
 
 #### v0.4.8
 

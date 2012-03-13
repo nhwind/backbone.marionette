@@ -1,4 +1,4 @@
-describe("item view rendering", function(){
+describe("item view", function(){
   var Model = Backbone.Model.extend();
 
   var Collection = Backbone.Collection.extend({
@@ -63,21 +63,28 @@ describe("item view rendering", function(){
   describe("after rendering", function(){
     var view;
     var renderResult;
+    var deferredDone;
 
     beforeEach(function(){
       view = new OnRenderView({});
       
       spyOn(view, "onRender").andCallThrough();
+      spyOn(view, "trigger").andCallThrough();
 
-      renderResult = view.render();
+      var deferred = view.render();
+      deferred.done(function(){deferredDone = true; });
     });
 
     it("should call an `onRender` method on the view", function(){
       expect(view.onRender).toHaveBeenCalled();
     });
 
-    it("should return the view", function(){
-      expect(renderResult).toBe(view);
+    it("should trigger a rendered event", function(){
+      expect(view.trigger).toHaveBeenCalledWith("item:rendered", view);
+    });
+
+    it("should resolve the returned deferred object", function(){
+      expect(deferredDone).toBe(true);
     });
   });
 
